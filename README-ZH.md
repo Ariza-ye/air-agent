@@ -36,6 +36,7 @@ agent-java/
 ├── agent-model-openai/         # OpenAI Chat Completions API 适配器
 ├── agent-model-anthropic/      # Anthropic Messages API 适配器
 ├── agent-tool-reflect/         # 注解式 Java 方法工具
+├── agent-tool-gdal/            # 基于 Docker 运行环境的 GDAL 命令行工具(可选)
 ├── agent-session/              # 内存和 PostgreSQL 会话存储
 ├── agent-tracing/              # Span 与追踪导出接口
 ├── agent-spring-boot-starter/  # Spring Boot 自动配置
@@ -49,6 +50,7 @@ agent-java/
 | [`agent-model-openai`](agent-model-openai/)               | OpenAI Chat Completions 请求、消息解析、工具调用与消息续传 | `OpenAIModelClient`                                               |
 | [`agent-model-anthropic`](agent-model-anthropic/)         | Anthropic Messages API 请求、内容块解析、工具调用与消息续传 | `AnthropicModelClient`                                            |
 | [`agent-tool-reflect`](agent-tool-reflect/)               | 从 Java 方法生成工具、参数 Schema 和返回字段说明           | `ReflectionToolFactory`、`AgentTool`、`ToolParam`、`ToolResultField` |
+| [`agent-tool-gdal`](agent-tool-gdal/)                     | 在 Docker 容器中执行白名单 GDAL/OGR 命令并返回日志        | `GdalTool`                                                        |
 | [`agent-session`](agent-session/)                         | JVM 内、PostgreSQL 和 MySQL 会话消息存储           | `InMemorySessionStore`、`PgSessionStore`、`MysqlSessionStore`       |
 | [`agent-tracing`](agent-tracing/)                         | 追踪导出实现                                    | `LogTraceExporter`                                                |
 | [`agent-spring-boot-starter`](agent-spring-boot-starter/) | 默认 OpenAI 客户端、Runner 和配置绑定                | `AgentsAutoConfiguration`、`AgentsProperties`                      |
@@ -65,6 +67,7 @@ flowchart TD
     OpenAI --> Core
     Anthropic --> Core
     Reflect --> Core
+    Gdal["agent-tool-gdal"] --> Core
     Session --> Core
     Tracing["agent-tracing"] --> Core
 ```
@@ -252,6 +255,46 @@ var agent = Agent.builder()
 - `ToolFieldFormat` 支持日期时间、URI、邮箱、IP、UUID、数值和二进制等常用格式。
 
 `examples/simple-agent` 会扫描 Spring 容器中包含 `@AgentTool` 方法的 Bean，并检查跨 Bean 的工具名重复。该扫描逻辑位于示例的 `AgentsConfiguration`，不是 Starter 自动配置的一部分。
+
+### 在 Docker 中执行 GDAL 命令
+
+`agent-tool-gdal` 在 Docker 容器内执行白名单内的 GDAL/OGR 命令并返回日志。它是可选模块，**不包含在** Spring Boot Starter
+中。先从模块目录的 `Dockerfile` 构建运行镜像：
+
+```bash
+docker build -t gdal-agent:latest agent-tool-gdal
+```
+
+添加依赖并注册工具：
+
+```xml
+<dependency>
+    <groupId>com.ariza.agent</groupId>
+    <artifactId>agent-tool-gdal</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
+</dependency>
+```
+
+```java
+import com.ariza.agent.tool.gdal.GdalTool;
+
+var agent = Agent.builder()
+        .name("GIS assistant")
+        .instructions("使用 gdal 工具检查地理空间文件")
+        .model("gpt-4.1-mini")
+        .tools(List.of(new GdalTool()))
+        .build();
+```
+
+`GdalTool` 提供 `run(String command)` 方法。命令必须以白名单内的 GDAL/OGR 工具开头（如 `gdalinfo`、`gdal_translate`、
+`gdalwarp`、`ogr2ogr`、`ogrinfo`），参数以 argv 数组形式直接传给容器，不经过任何 shell。可选 `mount` 参数把宿主目录挂载到
+`/data`，命令内通过 `/data/...` 引用文件：
+
+```java
+tool.run("gdalinfo /data/sample.tif", "/absolute/path/to/host/dir");
+```
+
+结果携带 `exitCode`、`stdout` 和 `stderr`。工具不在白名单、参数含 shell 元字符或容器运行超时时，命令会被拒绝。
 
 ## 模型适配器
 

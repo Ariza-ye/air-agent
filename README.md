@@ -37,6 +37,7 @@ agent-java/
 ├── agent-model-openai/         # OpenAI Chat Completions API adapter
 ├── agent-model-anthropic/      # Anthropic Messages API adapter
 ├── agent-tool-reflect/         # Annotation-based Java method tools
+├── agent-tool-gdal/            # GDAL CLI tool in a Docker runtime (optional)
 ├── agent-session/              # In-memory and PostgreSQL session storage
 ├── agent-tracing/              # Span and tracing export contracts
 ├── agent-spring-boot-starter/  # Spring Boot auto-configuration
@@ -50,6 +51,7 @@ agent-java/
 | [`agent-model-openai`](agent-model-openai/)               | OpenAI Chat Completions requests, message parsing, tool calls, and message continuation | `OpenAIModelClient`                                                  |
 | [`agent-model-anthropic`](agent-model-anthropic/)         | Anthropic Messages API requests, content blocks, tool calls, and message continuation   | `AnthropicModelClient`                                               |
 | [`agent-tool-reflect`](agent-tool-reflect/)               | Generate tools, parameter schemas, and result-field descriptions from Java methods      | `ReflectionToolFactory`, `AgentTool`, `ToolParam`, `ToolResultField` |
+| [`agent-tool-gdal`](agent-tool-gdal/)                     | Execute whitelisted GDAL/OGR commands in a Docker container and return their logs       | `GdalTool`                                                           |
 | [`agent-session`](agent-session/)                         | In-JVM, PostgreSQL, and MySQL session message storage                                   | `InMemorySessionStore`, `PgSessionStore`, `MysqlSessionStore`        |
 | [`agent-tracing`](agent-tracing/)                         | Tracing exporter implementations                                                        | `LogTraceExporter`                                                   |
 | [`agent-spring-boot-starter`](agent-spring-boot-starter/) | Default OpenAI client, Runner, and configuration binding                                | `AgentsAutoConfiguration`, `AgentsProperties`                        |
@@ -66,6 +68,7 @@ flowchart TD
     OpenAI --> Core
     Anthropic --> Core
     Reflect --> Core
+    Gdal["agent-tool-gdal"] --> Core
     Session --> Core
     Tracing["agent-tracing"] --> Core
 ```
@@ -251,6 +254,49 @@ Rules:
 - `ToolFieldFormat` supports common formats including date-time, URI, email, IP, UUID, numeric, and binary values.
 
 `examples/simple-agent` scans Spring beans containing methods annotated with `@AgentTool` and detects duplicate tool names across beans. This scanning logic belongs to the example's `AgentsConfiguration`; it is not part of Starter auto-configuration.
+
+### Run GDAL Commands in Docker
+
+`agent-tool-gdal` executes whitelisted GDAL/OGR commands inside a Docker container and returns their logs. It is an
+optional module and is **not** part of the Spring Boot Starter. First build the runtime image from the module's
+`Dockerfile`:
+
+```bash
+docker build -t gdal-agent:latest agent-tool-gdal
+```
+
+Add the module and register the tool with your Agent:
+
+```xml
+<dependency>
+    <groupId>com.ariza.agent</groupId>
+    <artifactId>agent-tool-gdal</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
+</dependency>
+```
+
+```java
+import com.ariza.agent.tool.gdal.GdalTool;
+
+var agent = Agent.builder()
+        .name("GIS assistant")
+        .instructions("Use the gdal tool to inspect geospatial files")
+        .model("gpt-4.1-mini")
+        .tools(List.of(new GdalTool()))
+        .build();
+```
+
+`GdalTool` exposes a `run(String command)` method. Commands must start with a whitelisted GDAL/OGR tool such as
+`gdalinfo`, `gdal_translate`, `gdalwarp`, `ogr2ogr`, or `ogrinfo`; arguments are passed to the container as an argv
+array without any shell. Use the optional `mount` argument to bind a host directory to `/data` and reference files as
+`/data/...` inside commands:
+
+```java
+tool.run("gdalinfo /data/sample.tif", "/absolute/path/to/host/dir");
+```
+
+The result carries `exitCode`, `stdout`, and `stderr`. A command is rejected when its tool is not whitelisted, arguments
+contain shell metacharacters, or the container run times out.
 
 ## Model Adapters
 
