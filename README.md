@@ -485,5 +485,4 @@ Current shared versions:
 
 ## Version and License
 
-The current version is `0.1.1-SNAPSHOT`, and the API may still change. This repository does not currently include a
-license file; do not assume a particular open-source license without explicit authorization.
+The current version is `0.1.1-SNAPSHOT`, and the API may still change. This repository currently uses the MIT License.
