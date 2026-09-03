@@ -13,7 +13,6 @@
         <module>agent-model-openai</module>
         <module>agent-model-anthropic</module>
         <module>agent-tool-reflect</module>
-        <module>agent-remote-sensing-tools</module>
         <module>agent-session</module>
         <module>agent-tracing</module>
         <module>agent-spring-boot-starter</module>

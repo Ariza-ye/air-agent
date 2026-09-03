@@ -37,7 +37,6 @@ agent-java/
 ├── agent-model-openai/         # OpenAI Responses API adapter
 ├── agent-model-anthropic/      # Anthropic Messages API adapter
 ├── agent-tool-reflect/         # Annotation-based Java method tools
-├── agent-remote-sensing-tools/  # Remote-sensing tools
 ├── agent-session/              # In-memory and PostgreSQL session storage
 ├── agent-tracing/              # Span and tracing export contracts
 ├── agent-spring-boot-starter/  # Spring Boot auto-configuration
@@ -51,7 +50,6 @@ agent-java/
 | [`agent-model-openai`](agent-model-openai/)                 | OpenAI Responses API requests, text parsing, tool calls, and continuation             | `OpenAIModelClient`                                                      |
 | [`agent-model-anthropic`](agent-model-anthropic/)           | Anthropic Messages API requests, content blocks, tool calls, and message continuation | `AnthropicModelClient`                                                   |
 | [`agent-tool-reflect`](agent-tool-reflect/)                 | Generate tools, parameter schemas, and result-field descriptions from Java methods    | `ReflectionToolFactory`, `AgentTool`, `ToolParam`, `ToolResultField`     |
-| [`agent-remote-sensing-tools`](agent-remote-sensing-tools/) | Remote-sensing tool extensions                                                        | `RasterStatsTool`, `CalcIndexTool`, `CompareImageTool`, `ZonalStatsTool` |
 | [`agent-session`](agent-session/)                           | In-JVM, PostgreSQL, and MySQL session message storage                                 | `InMemorySessionStore`, `PgSessionStore`, `MysqlSessionStore`            |
 | [`agent-tracing`](agent-tracing/)                           | Tracing exporter implementations                                                      | `LogTraceExporter`                                                       |
 | [`agent-spring-boot-starter`](agent-spring-boot-starter/)   | Default OpenAI client, Runner, and configuration binding                              | `AgentsAutoConfiguration`, `AgentsProperties`                            |
@@ -68,7 +66,6 @@ flowchart TD
     OpenAI --> Core
     Anthropic --> Core
     Reflect --> Core
-    RemoteSensing["agent-remote-sensing-tools"] --> Core
     Session --> Core
     Tracing["agent-tracing"] --> Core
 ```
@@ -467,7 +464,6 @@ mvn test
 mvn -pl agent-core -am test
 mvn -pl agent-model-anthropic -am test
 mvn -pl agent-tool-reflect -am test
-mvn -pl agent-remote-sensing-tools -am test
 
 # Install SNAPSHOT artifacts into the local Maven repository
 mvn clean install

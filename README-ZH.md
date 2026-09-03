@@ -34,7 +34,6 @@ agent-java/
 ├── agent-model-openai/         # OpenAI Responses API 适配器
 ├── agent-model-anthropic/      # Anthropic Messages API 适配器
 ├── agent-tool-reflect/         # 注解式 Java 方法工具
-├── agent-remote-sensing-tools/  # 遥感领域工具
 ├── agent-session/              # 内存和 PostgreSQL 会话存储
 ├── agent-tracing/              # Span 与追踪导出接口
 ├── agent-spring-boot-starter/  # Spring Boot 自动配置
@@ -48,7 +47,6 @@ agent-java/
 | [`agent-model-openai`](agent-model-openai/)                 | OpenAI Responses API 请求、文本解析、工具调用与 continuation | `OpenAIModelClient`                                                   |
 | [`agent-model-anthropic`](agent-model-anthropic/)           | Anthropic Messages API 请求、内容块解析、工具调用与消息续传       | `AnthropicModelClient`                                                |
 | [`agent-tool-reflect`](agent-tool-reflect/)                 | 从 Java 方法生成工具、参数 Schema 和返回字段说明                 | `ReflectionToolFactory`、`AgentTool`、`ToolParam`、`ToolResultField`     |
-| [`agent-remote-sensing-tools`](agent-remote-sensing-tools/) | 遥感领域工具扩展                                        | `RasterStatsTool`、`CalcIndexTool`、`CompareImageTool`、`ZonalStatsTool` |
 | [`agent-session`](agent-session/)                           | JVM 内、PostgreSQL 和 MySQL 会话消息存储                 | `InMemorySessionStore`、`PgSessionStore`、`MysqlSessionStore`           |
 | [`agent-tracing`](agent-tracing/)                           | 追踪导出实现                                          | `LogTraceExporter`                                                    |
 | [`agent-spring-boot-starter`](agent-spring-boot-starter/)   | 默认 OpenAI 客户端、Runner 和配置绑定                      | `AgentsAutoConfiguration`、`AgentsProperties`                          |
@@ -65,7 +63,6 @@ flowchart TD
     OpenAI --> Core
     Anthropic --> Core
     Reflect --> Core
-    RemoteSensing["agent-remote-sensing-tools"] --> Core
     Session --> Core
     Tracing["agent-tracing"] --> Core
 ```
@@ -463,7 +460,6 @@ mvn test
 mvn -pl agent-core -am test
 mvn -pl agent-model-anthropic -am test
 mvn -pl agent-tool-reflect -am test
-mvn -pl agent-remote-sensing-tools -am test
 
 # 安装 SNAPSHOT 到本地 Maven 仓库
 mvn clean install
