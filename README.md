@@ -11,6 +11,8 @@ Two model adapters are currently built in:
 
 `Runner` is decoupled from model providers and can complete the “model request → tool call → tool result → final text” loop within a single run.
 
+**Tips: `Codex` was used during the development of this project.**
+
 > Inspired by [openai-agents-python](https://github.com/openai/openai-agents-python).
 
 ## Requirements

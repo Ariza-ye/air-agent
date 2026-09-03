@@ -10,6 +10,8 @@ Spring Boot 自动配置。
 
 `Runner` 与模型提供商解耦，可以在一次运行内完成“模型请求 → 工具调用 → 工具结果回传 → 最终文本”的循环。
 
+**Tips: 此项目在开发过程中使用了 `Codex`**
+
 > 实现参考：[openai-agents-python](https://github.com/openai/openai-agents-python)
 
 ## 环境要求
