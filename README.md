@@ -1,8 +1,6 @@
-<p align="right">
-  <a href="README-ZH.md"><kbd>中文</kbd></a>
-</p>
-
 # Java Agents
+
+[中文](README-ZH.md)
 
 Java Agents is a lightweight Agent Runtime for Java 17 and Spring Boot 3. It provides agent definitions, model invocation, function tool execution, handoff and guardrail contracts, session storage, tracing, and Spring Boot auto-configuration.
 
