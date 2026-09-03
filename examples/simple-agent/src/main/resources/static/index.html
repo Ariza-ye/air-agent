@@ -1,0 +1,1683 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta content="小爱智能助手，帮助你快速查询系统信息、整理内容并回答问题。" name="description">
+    <meta content="#f7f5f0" name="theme-color">
+    <title>小爱 · 智能助手</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #f7f5f0;
+            --panel: rgba(255, 255, 255, 0.78);
+            --panel-solid: #fffefb;
+            --sidebar: #ebe7de;
+            --text: #22211f;
+            --muted: #77736b;
+            --faint: #aaa59b;
+            --line: rgba(48, 45, 39, 0.11);
+            --accent: #6657d9;
+            --accent-strong: #5142c6;
+            --accent-soft: #edeafe;
+            --user: #28262f;
+            --danger: #b84a48;
+            --shadow: 0 20px 60px rgba(52, 47, 38, 0.10);
+            --font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --page: #171718;
+            --panel: rgba(31, 31, 33, 0.84);
+            --panel-solid: #202023;
+            --sidebar: #1c1c1e;
+            --text: #f3f1eb;
+            --muted: #aaa69d;
+            --faint: #77736d;
+            --line: rgba(255, 255, 255, 0.09);
+            --accent: #9d91ff;
+            --accent-strong: #b5adff;
+            --accent-soft: #302d4c;
+            --user: #ece9e2;
+            --danger: #ee8582;
+            --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            color: var(--text);
+            background: var(--page);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button,
+        textarea {
+            font: inherit;
+        }
+
+        button {
+            color: inherit;
+        }
+
+        button:focus-visible,
+        textarea:focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+            outline-offset: 2px;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .app {
+            height: 100dvh;
+            display: grid;
+            grid-template-columns: 286px minmax(0, 1fr);
+        }
+
+        .sidebar {
+            position: relative;
+            z-index: 20;
+            min-width: 0;
+            padding: 22px 16px 18px;
+            display: flex;
+            flex-direction: column;
+            background: var(--sidebar);
+            border-right: 1px solid var(--line);
+        }
+
+        .brand {
+            padding: 0 7px 22px;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .brand-mark,
+        .assistant-avatar {
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            color: white;
+            background: linear-gradient(145deg, #8073eb, #5748c7);
+            box-shadow: 0 8px 22px rgba(91, 75, 204, 0.24);
+        }
+
+        .brand-mark {
+            width: 38px;
+            height: 38px;
+            border-radius: 13px 13px 13px 5px;
+            font-size: 18px;
+            font-weight: 750;
+        }
+
+        .brand-name {
+            font-size: 16px;
+            font-weight: 720;
+            letter-spacing: -0.01em;
+        }
+
+        .brand-subtitle {
+            margin-top: 2px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .new-chat {
+            width: 100%;
+            min-height: 44px;
+            padding: 0 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--line);
+            border-radius: 13px;
+            background: var(--panel-solid);
+            box-shadow: 0 5px 16px rgba(48, 43, 34, 0.04);
+            font-weight: 650;
+            cursor: pointer;
+            transition: transform 160ms ease, border-color 160ms ease;
+        }
+
+        .new-chat:hover {
+            border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+            transform: translateY(-1px);
+        }
+
+        .new-chat span:last-child {
+            color: var(--accent);
+            font-size: 22px;
+            font-weight: 350;
+        }
+
+        .history-label {
+            margin: 26px 9px 9px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .history {
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            align-content: start;
+            gap: 4px;
+            overflow-y: auto;
+            list-style: none;
+            scrollbar-width: thin;
+        }
+
+        .history-empty {
+            padding: 14px 9px;
+            color: var(--faint);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .history-item {
+            position: relative;
+        }
+
+        .history-button {
+            width: 100%;
+            padding: 10px 34px 10px 11px;
+            display: grid;
+            gap: 4px;
+            border: 0;
+            border-radius: 10px;
+            color: var(--muted);
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .history-button:hover,
+        .history-item.is-active .history-button {
+            color: var(--text);
+            background: color-mix(in srgb, var(--panel-solid) 66%, transparent);
+        }
+
+        .history-title {
+            overflow: hidden;
+            font-size: 13px;
+            font-weight: 590;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-time {
+            color: var(--faint);
+            font-size: 10px;
+        }
+
+        .delete-chat {
+            position: absolute;
+            top: 50%;
+            right: 7px;
+            width: 27px;
+            height: 27px;
+            border: 0;
+            border-radius: 8px;
+            color: var(--faint);
+            background: transparent;
+            opacity: 0;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+
+        .history-item:hover .delete-chat,
+        .delete-chat:focus-visible {
+            opacity: 1;
+        }
+
+        .delete-chat:hover {
+            color: var(--danger);
+            background: color-mix(in srgb, var(--danger) 9%, transparent);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding-top: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--line);
+        }
+
+        .profile {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .online-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #58a56f;
+            box-shadow: 0 0 0 4px rgba(88, 165, 111, 0.12);
+        }
+
+        .icon-button {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border: 0;
+            border-radius: 10px;
+            color: var(--muted);
+            background: transparent;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        .icon-button:hover {
+            color: var(--text);
+            background: var(--panel-solid);
+        }
+
+        .main {
+            min-width: 0;
+            min-height: 0;
+            position: relative;
+            display: grid;
+            grid-template-rows: 68px minmax(0, 1fr) auto;
+            background: radial-gradient(circle at 82% 4%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 30%),
+            var(--page);
+        }
+
+        .topbar {
+            padding: 0 clamp(18px, 3.5vw, 52px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--line);
+            background: color-mix(in srgb, var(--page) 86%, transparent);
+            backdrop-filter: blur(15px);
+        }
+
+        .topbar-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        .status-pill {
+            padding: 4px 8px;
+            border-radius: 999px;
+            color: #39764b;
+            background: #e5f3e8;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        :root[data-theme="dark"] .status-pill {
+            color: #94d4a7;
+            background: #263b2c;
+        }
+
+        .menu-button {
+            display: none;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .messages {
+            min-height: 0;
+            padding: 40px clamp(20px, 6vw, 80px) 24px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+        }
+
+        .conversation {
+            width: min(820px, 100%);
+            min-height: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        .welcome {
+            margin: auto 0;
+            padding: 34px 0 70px;
+            animation: rise 480ms ease both;
+        }
+
+        .welcome-badge {
+            width: 54px;
+            height: 54px;
+            margin-bottom: 24px;
+            display: grid;
+            place-items: center;
+            border-radius: 18px 18px 18px 6px;
+            color: white;
+            background: linear-gradient(145deg, #887bf0, #5748c6);
+            box-shadow: 0 13px 35px rgba(88, 72, 199, 0.24);
+            font-size: 24px;
+            font-weight: 750;
+        }
+
+        .welcome h1 {
+            max-width: 700px;
+            margin: 0;
+            font-size: clamp(30px, 4.2vw, 52px);
+            line-height: 1.12;
+            letter-spacing: -0.045em;
+        }
+
+        .welcome h1 span {
+            color: var(--accent);
+        }
+
+        .welcome-copy {
+            max-width: 570px;
+            margin: 17px 0 30px;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.75;
+        }
+
+        .suggestions {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .suggestion {
+            min-height: 116px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            color: var(--text);
+            background: var(--panel);
+            box-shadow: 0 8px 25px rgba(54, 49, 40, 0.035);
+            text-align: left;
+            cursor: pointer;
+            transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .suggestion:hover {
+            border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+            box-shadow: var(--shadow);
+            transform: translateY(-3px);
+        }
+
+        .suggestion-icon {
+            color: var(--accent);
+            font-size: 19px;
+        }
+
+        .suggestion strong {
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .message {
+            display: grid;
+            grid-template-columns: 36px minmax(0, 1fr);
+            gap: 13px;
+            align-items: start;
+            animation: rise 260ms ease both;
+        }
+
+        .message[data-role="user"] {
+            grid-template-columns: minmax(0, 1fr);
+            justify-items: end;
+        }
+
+        .assistant-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px 12px 12px 4px;
+            font-size: 15px;
+            font-weight: 750;
+        }
+
+        .message-content {
+            min-width: 0;
+            max-width: 680px;
+            padding-top: 5px;
+        }
+
+        .message-name {
+            margin-bottom: 7px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .message-text {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.78;
+            overflow-wrap: anywhere;
+        }
+
+        .message-text > :first-child {
+            margin-top: 0;
+        }
+
+        .message-text > :last-child {
+            margin-bottom: 0;
+        }
+
+        .message-text p {
+            margin: 0.65em 0;
+        }
+
+        .message-text h1,
+        .message-text h2,
+        .message-text h3,
+        .message-text h4,
+        .message-text h5,
+        .message-text h6 {
+            margin: 1.15em 0 0.45em;
+            line-height: 1.35;
+            letter-spacing: -0.015em;
+        }
+
+        .message-text h1 {
+            font-size: 1.45em;
+        }
+
+        .message-text h2 {
+            font-size: 1.3em;
+        }
+
+        .message-text h3 {
+            font-size: 1.16em;
+        }
+
+        .message-text h4,
+        .message-text h5,
+        .message-text h6 {
+            font-size: 1em;
+        }
+
+        .message-text ul,
+        .message-text ol {
+            margin: 0.65em 0;
+            padding-left: 1.55em;
+        }
+
+        .message-text li {
+            margin: 0.24em 0;
+            padding-left: 0.12em;
+        }
+
+        .message-text blockquote {
+            margin: 0.8em 0;
+            padding: 0.2em 0 0.2em 1em;
+            border-left: 3px solid var(--accent);
+            color: var(--muted);
+        }
+
+        .message-text blockquote p {
+            margin: 0;
+        }
+
+        .message-text code {
+            padding: 0.16em 0.38em;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: var(--accent-soft);
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+            font-size: 0.88em;
+        }
+
+        .message-text pre {
+            max-width: 100%;
+            margin: 0.9em 0;
+            padding: 14px 16px;
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--sidebar) 65%, var(--panel-solid));
+            line-height: 1.6;
+            white-space: pre;
+        }
+
+        .message-text pre code {
+            padding: 0;
+            border: 0;
+            background: transparent;
+            font-size: 0.84em;
+        }
+
+        .message-text a {
+            color: var(--accent-strong);
+            text-decoration-thickness: 1px;
+            text-underline-offset: 3px;
+        }
+
+        .message-text a:hover {
+            text-decoration-thickness: 2px;
+        }
+
+        .message-text hr {
+            margin: 1.1em 0;
+            border: 0;
+            border-top: 1px solid var(--line);
+        }
+
+        .message-text .table-scroll {
+            max-width: 100%;
+            margin: 0.9em 0;
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+        }
+
+        .message-text table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92em;
+        }
+
+        .message-text th,
+        .message-text td {
+            padding: 8px 11px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .message-text th {
+            background: var(--accent-soft);
+            font-weight: 700;
+        }
+
+        .message-text tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .message[data-role="user"] .message-text,
+        .message[data-role="error"] .message-text {
+            white-space: pre-wrap;
+        }
+
+        .message[data-role="user"] .message-content {
+            max-width: min(620px, 88%);
+            padding: 12px 17px;
+            border-radius: 18px 18px 5px 18px;
+            color: var(--page);
+            background: var(--user);
+        }
+
+        :root[data-theme="dark"] .message[data-role="user"] .message-content {
+            color: #242326;
+        }
+
+        .message[data-role="error"] .message-text {
+            color: var(--danger);
+        }
+
+        .message-actions {
+            margin-top: 9px;
+            display: flex;
+            gap: 6px;
+        }
+
+        .message-usage {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            color: var(--faint);
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .message-usage span {
+            padding: 3px 7px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--panel-solid) 55%, transparent);
+        }
+
+        .mini-button {
+            padding: 4px 8px;
+            border: 0;
+            border-radius: 7px;
+            color: var(--muted);
+            background: transparent;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .mini-button:hover {
+            color: var(--text);
+            background: var(--accent-soft);
+        }
+
+        .thinking {
+            height: 26px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .thinking i {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: bounce 1.1s ease-in-out infinite;
+        }
+
+        .thinking i:nth-child(2) {
+            animation-delay: 130ms;
+        }
+
+        .thinking i:nth-child(3) {
+            animation-delay: 260ms;
+        }
+
+        .composer-wrap {
+            padding: 12px clamp(18px, 6vw, 80px) 22px;
+            background: linear-gradient(transparent, var(--page) 24%);
+        }
+
+        .composer {
+            width: min(820px, 100%);
+            margin: 0 auto;
+        }
+
+        .input-card {
+            padding: 9px 9px 9px 18px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+            gap: 12px;
+            border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+            border-radius: 21px;
+            background: var(--panel-solid);
+            box-shadow: 0 12px 40px rgba(50, 45, 37, 0.10);
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        .input-card:focus-within {
+            border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+            box-shadow: 0 15px 45px rgba(76, 62, 177, 0.13);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 40px;
+            max-height: 170px;
+            padding: 9px 0 7px;
+            resize: none;
+            border: 0;
+            outline: 0 !important;
+            color: var(--text);
+            background: transparent;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        textarea::placeholder {
+            color: var(--faint);
+        }
+
+        .send-button {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border: 0;
+            border-radius: 14px;
+            color: white;
+            background: var(--accent);
+            font-size: 19px;
+            cursor: pointer;
+            transition: transform 160ms ease, background 160ms ease;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background: var(--accent-strong);
+            transform: translateY(-1px);
+        }
+
+        .send-button:disabled {
+            opacity: 0.38;
+            cursor: not-allowed;
+        }
+
+        .send-button[data-running="true"] {
+            background: var(--user);
+            font-size: 11px;
+        }
+
+        .composer-note {
+            margin: 9px 0 0;
+            color: var(--faint);
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .sidebar-backdrop,
+        .toast {
+            position: fixed;
+            z-index: 15;
+        }
+
+        .sidebar-backdrop {
+            inset: 0;
+            display: none;
+            border: 0;
+            background: rgba(0, 0, 0, 0.34);
+        }
+
+        .toast {
+            left: 50%;
+            bottom: 26px;
+            padding: 10px 15px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: var(--text);
+            background: var(--panel-solid);
+            box-shadow: var(--shadow);
+            font-size: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, 10px);
+            transition: opacity 180ms ease, transform 180ms ease;
+        }
+
+        .toast.is-visible {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(9px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 55%, 100% {
+                opacity: 0.35;
+                transform: translateY(0);
+            }
+            28% {
+                opacity: 1;
+                transform: translateY(-4px);
+            }
+        }
+
+        @media (max-width: 760px) {
+            .app {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                width: min(86vw, 310px);
+                transform: translateX(-102%);
+                transition: transform 220ms ease;
+            }
+
+            body[data-sidebar-open="true"] .sidebar {
+                transform: translateX(0);
+            }
+
+            body[data-sidebar-open="true"] .sidebar-backdrop {
+                display: block;
+            }
+
+            .menu-button {
+                display: grid;
+            }
+
+            .topbar {
+                height: 60px;
+                padding: 0 14px;
+            }
+
+            .topbar-title {
+                margin-right: auto;
+            }
+
+            .main {
+                grid-template-rows: 60px minmax(0, 1fr) auto;
+            }
+
+            .messages {
+                padding: 28px 16px 16px;
+            }
+
+            .welcome {
+                padding: 18px 0 38px;
+            }
+
+            .welcome h1 {
+                font-size: 34px;
+            }
+
+            .suggestions {
+                grid-template-columns: 1fr;
+            }
+
+            .suggestion {
+                min-height: 74px;
+                display: grid;
+                grid-template-columns: 28px minmax(0, 1fr);
+                align-items: center;
+            }
+
+            .composer-wrap {
+                padding: 10px 12px 14px;
+            }
+
+            .composer-note {
+                display: none;
+            }
+
+            .message[data-role="user"] .message-content {
+                max-width: 92%;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body data-sidebar-open="false">
+<div class="app">
+    <aside aria-label="会话导航" class="sidebar" id="sidebar">
+        <div class="brand">
+            <div aria-hidden="true" class="brand-mark">小</div>
+            <div>
+                <div class="brand-name">小爱智能助手</div>
+                <div class="brand-subtitle">你的系统信息小帮手</div>
+            </div>
+        </div>
+
+        <button class="new-chat" id="newChat" type="button">
+            <span>开始新对话</span><span aria-hidden="true">＋</span>
+        </button>
+
+        <div class="history-label">最近对话</div>
+        <ul aria-label="历史会话" class="history" id="history"></ul>
+
+        <div class="sidebar-footer">
+            <div class="profile"><span aria-hidden="true" class="online-dot"></span><span>服务已就绪</span></div>
+            <button aria-label="切换深色模式" class="icon-button" id="themeToggle" title="切换主题" type="button">☾
+            </button>
+        </div>
+    </aside>
+
+    <button aria-label="关闭会话导航" class="sidebar-backdrop" id="sidebarBackdrop" type="button"></button>
+
+    <main class="main">
+        <header class="topbar">
+            <button aria-controls="sidebar" aria-expanded="false" aria-label="打开会话导航"
+                    class="icon-button menu-button"
+                    id="menuButton" type="button">☰
+            </button>
+            <div class="topbar-title">小爱 <span class="status-pill">在线</span></div>
+            <div class="topbar-actions">
+                <button aria-label="新建对话" class="icon-button" id="mobileNewChat" title="新建对话" type="button">＋
+                </button>
+            </div>
+        </header>
+
+        <section aria-label="对话内容" aria-live="polite" class="messages" id="messages">
+            <div class="conversation" id="conversation"></div>
+        </section>
+
+        <div class="composer-wrap">
+            <form class="composer" id="composer">
+                <div class="input-card">
+                    <label class="sr-only" for="prompt">向小爱提问</label>
+                    <textarea aria-label="向小爱提问" id="prompt" maxlength="10000"
+                              placeholder="问问小爱任何系统相关问题…"
+                              rows="1"></textarea>
+                    <button aria-label="发送消息" class="send-button" disabled id="sendButton" type="submit">↑</button>
+                </div>
+                <p class="composer-note">小爱可能会出错，请核对重要信息 · Enter 发送，Shift + Enter 换行</p>
+            </form>
+        </div>
+    </main>
+</div>
+
+<div aria-live="polite" class="toast" id="toast" role="status"></div>
+
+<script>
+    (() => {
+        const API_ENDPOINT = "/agents/run";
+        const STORAGE_KEY = "xiaoai-user-conversations-v1";
+        const THEME_KEY = "xiaoai-theme";
+        const MAX_CONVERSATIONS = 20;
+
+        const elements = {
+            body: document.body,
+            composer: document.querySelector("#composer"),
+            prompt: document.querySelector("#prompt"),
+            sendButton: document.querySelector("#sendButton"),
+            messages: document.querySelector("#messages"),
+            conversation: document.querySelector("#conversation"),
+            history: document.querySelector("#history"),
+            newChat: document.querySelector("#newChat"),
+            mobileNewChat: document.querySelector("#mobileNewChat"),
+            menuButton: document.querySelector("#menuButton"),
+            sidebarBackdrop: document.querySelector("#sidebarBackdrop"),
+            themeToggle: document.querySelector("#themeToggle"),
+            toast: document.querySelector("#toast")
+        };
+
+        let state = {activeId: "", conversations: []};
+        let activeController = null;
+        let pendingElement = null;
+        let toastTimer = null;
+
+        function createId() {
+            return globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+
+        function createConversation() {
+            const id = createId();
+            return {id, sessionId: id, title: "新对话", messages: [], updatedAt: Date.now()};
+        }
+
+        function currentConversation() {
+            return state.conversations.find((item) => item.id === state.activeId);
+        }
+
+        function loadState() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+                if (saved && Array.isArray(saved.conversations)) {
+                    state = saved;
+                }
+            } catch (error) {
+                state = {activeId: "", conversations: []};
+            }
+            if (!currentConversation()) {
+                const conversation = createConversation();
+                state.conversations.unshift(conversation);
+                state.activeId = conversation.id;
+            }
+        }
+
+        function saveState() {
+            state.conversations = state.conversations
+                .sort((a, b) => b.updatedAt - a.updatedAt)
+                .slice(0, MAX_CONVERSATIONS);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            if (date.toDateString() === now.toDateString()) {
+                return date.toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit"});
+            }
+            return date.toLocaleDateString("zh-CN", {month: "short", day: "numeric"});
+        }
+
+        function showToast(message) {
+            window.clearTimeout(toastTimer);
+            elements.toast.textContent = message;
+            elements.toast.classList.add("is-visible");
+            toastTimer = window.setTimeout(() => elements.toast.classList.remove("is-visible"), 1800);
+        }
+
+        function setSidebar(open) {
+            elements.body.dataset.sidebarOpen = String(open);
+            elements.menuButton.setAttribute("aria-expanded", String(open));
+        }
+
+        function renderHistory() {
+            elements.history.replaceChildren();
+            const populated = state.conversations.filter((item) => item.messages.length > 0);
+            if (populated.length === 0) {
+                const empty = document.createElement("li");
+                empty.className = "history-empty";
+                empty.textContent = "你的对话会显示在这里";
+                elements.history.append(empty);
+                return;
+            }
+
+            populated.forEach((item) => {
+                const row = document.createElement("li");
+                row.className = `history-item${item.id === state.activeId ? " is-active" : ""}`;
+
+                const openButton = document.createElement("button");
+                openButton.className = "history-button";
+                openButton.type = "button";
+                openButton.dataset.conversationId = item.id;
+
+                const title = document.createElement("span");
+                title.className = "history-title";
+                title.textContent = item.title;
+                const time = document.createElement("span");
+                time.className = "history-time";
+                time.textContent = formatTime(item.updatedAt);
+                openButton.append(title, time);
+
+                const deleteButton = document.createElement("button");
+                deleteButton.className = "delete-chat";
+                deleteButton.type = "button";
+                deleteButton.dataset.deleteId = item.id;
+                deleteButton.setAttribute("aria-label", `删除对话：${item.title}`);
+                deleteButton.textContent = "×";
+                row.append(openButton, deleteButton);
+                elements.history.append(row);
+            });
+        }
+
+        function createWelcome() {
+            const welcome = document.createElement("div");
+            welcome.className = "welcome";
+            welcome.innerHTML = `
+                <div aria-hidden="true" class="welcome-badge">小</div>
+                <h1>你好，我是<span>小爱</span>。<br>今天想了解什么？</h1>
+                <p class="welcome-copy">我可以帮你查询系统信息、梳理内容，也能围绕上下文继续交流。选择一个问题，或者直接告诉我你的需求。</p>
+                <div aria-label="推荐问题" class="suggestions">
+                    <button class="suggestion" data-prompt="帮我查询最新的系统新闻列表" type="button"><span class="suggestion-icon">⌁</span><strong>查看最新的<br>系统新闻</strong></button>
+                    <button class="suggestion" data-prompt="请介绍一下当前系统支持哪些能力" type="button"><span class="suggestion-icon">◎</span><strong>了解系统支持的<br>主要能力</strong></button>
+                    <button class="suggestion" data-prompt="帮我总结一下刚才对话中的重点" type="button"><span class="suggestion-icon">≡</span><strong>总结对话中的<br>关键信息</strong></button>
+                </div>`;
+            return welcome;
+        }
+
+        function appendInlineMarkdown(container, source) {
+            const tokenPattern = /(\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|`[^`\n]+`|\[[^\]\n]+]\([^)\s\n]+\)|\*[^*\n]+\*|_[^_\n]+_)/g;
+            let cursor = 0;
+            let match;
+
+            while ((match = tokenPattern.exec(source)) !== null) {
+                if (match.index > cursor) {
+                    container.append(document.createTextNode(source.slice(cursor, match.index)));
+                }
+
+                const token = match[0];
+                let element;
+                if ((token.startsWith("**") && token.endsWith("**")) ||
+                    (token.startsWith("__") && token.endsWith("__"))) {
+                    element = document.createElement("strong");
+                    element.textContent = token.slice(2, -2);
+                } else if (token.startsWith("~~") && token.endsWith("~~")) {
+                    element = document.createElement("del");
+                    element.textContent = token.slice(2, -2);
+                } else if (token.startsWith("`") && token.endsWith("`")) {
+                    element = document.createElement("code");
+                    element.textContent = token.slice(1, -1);
+                } else if (token.startsWith("[")) {
+                    const linkMatch = token.match(/^\[([^\]]+)]\(([^)]+)\)$/);
+                    const href = linkMatch?.[2] || "";
+                    if (/^(https?:|mailto:)/i.test(href)) {
+                        element = document.createElement("a");
+                        element.href = href;
+                        element.target = "_blank";
+                        element.rel = "noopener noreferrer";
+                        element.textContent = linkMatch[1];
+                    } else {
+                        element = document.createTextNode(linkMatch?.[1] || token);
+                    }
+                } else {
+                    element = document.createElement("em");
+                    element.textContent = token.slice(1, -1);
+                }
+                container.append(element);
+                cursor = tokenPattern.lastIndex;
+            }
+
+            if (cursor < source.length) {
+                container.append(document.createTextNode(source.slice(cursor)));
+            }
+        }
+
+        function appendInlineLines(container, source) {
+            source.split("\n").forEach((line, index) => {
+                if (index > 0) {
+                    container.append(document.createElement("br"));
+                }
+                appendInlineMarkdown(container, line);
+            });
+        }
+
+        function splitTableRow(line) {
+            return line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+        }
+
+        function isBlockStart(lines, index) {
+            const line = lines[index] || "";
+            const nextLine = lines[index + 1] || "";
+            return /^\s*```/.test(line) || /^#{1,6}\s+/.test(line) || /^\s*>\s?/.test(line) ||
+                /^\s*(?:[-+*]|\d+[.)])\s+/.test(line) || /^\s*(?:---+|___+|\*\*\*+)\s*$/.test(line) ||
+                (line.includes("|") && /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(nextLine));
+        }
+
+        function renderMarkdown(source) {
+            const root = document.createElement("div");
+            root.className = "message-text";
+            const lines = String(source || "").replace(/\r\n?/g, "\n").split("\n");
+            let index = 0;
+
+            while (index < lines.length) {
+                const line = lines[index];
+                if (!line.trim()) {
+                    index += 1;
+                    continue;
+                }
+
+                const fence = line.match(/^\s*```([\w+-]*)\s*$/);
+                if (fence) {
+                    const codeLines = [];
+                    index += 1;
+                    while (index < lines.length && !/^\s*```\s*$/.test(lines[index])) {
+                        codeLines.push(lines[index]);
+                        index += 1;
+                    }
+                    if (index < lines.length) {
+                        index += 1;
+                    }
+                    const pre = document.createElement("pre");
+                    const code = document.createElement("code");
+                    if (fence[1]) {
+                        code.dataset.language = fence[1];
+                    }
+                    code.textContent = codeLines.join("\n");
+                    pre.append(code);
+                    root.append(pre);
+                    continue;
+                }
+
+                const heading = line.match(/^(#{1,6})\s+(.+)$/);
+                if (heading) {
+                    const element = document.createElement(`h${heading[1].length}`);
+                    appendInlineMarkdown(element, heading[2]);
+                    root.append(element);
+                    index += 1;
+                    continue;
+                }
+
+                if (/^\s*(?:---+|___+|\*\*\*+)\s*$/.test(line)) {
+                    root.append(document.createElement("hr"));
+                    index += 1;
+                    continue;
+                }
+
+                if (/^\s*>\s?/.test(line)) {
+                    const quoteLines = [];
+                    while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+                        quoteLines.push(lines[index].replace(/^\s*>\s?/, ""));
+                        index += 1;
+                    }
+                    const blockquote = document.createElement("blockquote");
+                    const paragraph = document.createElement("p");
+                    appendInlineLines(paragraph, quoteLines.join("\n"));
+                    blockquote.append(paragraph);
+                    root.append(blockquote);
+                    continue;
+                }
+
+                const listMatch = line.match(/^\s*(?:(\d+)[.)]|([-+*]))\s+(.+)$/);
+                if (listMatch) {
+                    const ordered = Boolean(listMatch[1]);
+                    const list = document.createElement(ordered ? "ol" : "ul");
+                    if (ordered && Number(listMatch[1]) !== 1) {
+                        list.start = Number(listMatch[1]);
+                    }
+                    while (index < lines.length) {
+                        const itemMatch = lines[index].match(/^\s*(?:(\d+)[.)]|([-+*]))\s+(.+)$/);
+                        if (!itemMatch || Boolean(itemMatch[1]) !== ordered) {
+                            break;
+                        }
+                        const item = document.createElement("li");
+                        appendInlineMarkdown(item, itemMatch[3]);
+                        list.append(item);
+                        index += 1;
+                    }
+                    root.append(list);
+                    continue;
+                }
+
+                const tableDivider = lines[index + 1] || "";
+                if (line.includes("|") && /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(tableDivider)) {
+                    const headers = splitTableRow(line);
+                    const table = document.createElement("table");
+                    const head = document.createElement("thead");
+                    const headRow = document.createElement("tr");
+                    headers.forEach((header) => {
+                        const cell = document.createElement("th");
+                        appendInlineMarkdown(cell, header);
+                        headRow.append(cell);
+                    });
+                    head.append(headRow);
+                    table.append(head);
+                    index += 2;
+
+                    const body = document.createElement("tbody");
+                    while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
+                        const row = document.createElement("tr");
+                        splitTableRow(lines[index]).forEach((value) => {
+                            const cell = document.createElement("td");
+                            appendInlineMarkdown(cell, value);
+                            row.append(cell);
+                        });
+                        body.append(row);
+                        index += 1;
+                    }
+                    table.append(body);
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "table-scroll";
+                    wrapper.append(table);
+                    root.append(wrapper);
+                    continue;
+                }
+
+                const paragraphLines = [line];
+                index += 1;
+                while (index < lines.length && lines[index].trim() && !isBlockStart(lines, index)) {
+                    paragraphLines.push(lines[index]);
+                    index += 1;
+                }
+                const paragraph = document.createElement("p");
+                appendInlineLines(paragraph, paragraphLines.join("\n"));
+                root.append(paragraph);
+            }
+            return root;
+        }
+
+        function normalizeUsage(usage) {
+            if (!usage || typeof usage !== "object") {
+                return null;
+            }
+
+            const normalizeTokenCount = (value) => {
+                const count = Number(value);
+                return Number.isFinite(count) && count >= 0 ? Math.trunc(count) : 0;
+            };
+            return {
+                inputTokens: normalizeTokenCount(usage.inputTokens),
+                outputTokens: normalizeTokenCount(usage.outputTokens),
+                totalTokens: normalizeTokenCount(usage.totalTokens),
+                cachedInputTokens: normalizeTokenCount(usage.cachedInputTokens),
+                reasoningTokens: normalizeTokenCount(usage.reasoningTokens)
+            };
+        }
+
+        function createUsage(usage) {
+            const normalized = normalizeUsage(usage);
+            if (!normalized) {
+                return null;
+            }
+
+            const fields = [
+                ["输入", normalized.inputTokens],
+                ["输出", normalized.outputTokens],
+                ["总计", normalized.totalTokens]
+            ];
+            if (normalized.cachedInputTokens > 0) {
+                fields.push(["缓存", normalized.cachedInputTokens]);
+            }
+            if (normalized.reasoningTokens > 0) {
+                fields.push(["推理", normalized.reasoningTokens]);
+            }
+
+            const usageElement = document.createElement("div");
+            usageElement.className = "message-usage";
+            usageElement.setAttribute("aria-label", "Token 用量");
+            fields.forEach(([label, value]) => {
+                const item = document.createElement("span");
+                item.textContent = `${label} ${value.toLocaleString("zh-CN")}`;
+                usageElement.append(item);
+            });
+            return usageElement;
+        }
+
+        function createMessage(message, index) {
+            const article = document.createElement("article");
+            article.className = "message";
+            article.dataset.role = message.role;
+
+            if (message.role !== "user") {
+                const avatar = document.createElement("div");
+                avatar.className = "assistant-avatar";
+                avatar.setAttribute("aria-hidden", "true");
+                avatar.textContent = "小";
+                article.append(avatar);
+            }
+
+            const content = document.createElement("div");
+            content.className = "message-content";
+            if (message.role !== "user") {
+                const name = document.createElement("div");
+                name.className = "message-name";
+                name.textContent = message.role === "error" ? "连接提示" : "小爱";
+                content.append(name);
+            }
+
+            let text;
+            if (message.role === "assistant") {
+                text = renderMarkdown(message.content);
+            } else {
+                text = document.createElement("p");
+                text.className = "message-text";
+                text.textContent = message.content;
+            }
+            content.append(text);
+
+            if (message.role === "assistant") {
+                const usage = createUsage(message.usage);
+                if (usage) {
+                    content.append(usage);
+                }
+                const actions = document.createElement("div");
+                actions.className = "message-actions";
+                const copy = document.createElement("button");
+                copy.className = "mini-button";
+                copy.type = "button";
+                copy.dataset.copyIndex = String(index);
+                copy.textContent = "复制";
+                actions.append(copy);
+                content.append(actions);
+            }
+            article.append(content);
+            return article;
+        }
+
+        function renderConversation() {
+            elements.conversation.replaceChildren();
+            const conversation = currentConversation();
+            if (!conversation || conversation.messages.length === 0) {
+                elements.conversation.append(createWelcome());
+            } else {
+                conversation.messages.forEach((message, index) => {
+                    elements.conversation.append(createMessage(message, index));
+                });
+            }
+            renderHistory();
+            scrollToBottom(false);
+        }
+
+        function scrollToBottom(smooth = true) {
+            requestAnimationFrame(() => {
+                elements.messages.scrollTo({top: elements.messages.scrollHeight, behavior: smooth ? "smooth" : "auto"});
+            });
+        }
+
+        function addThinking() {
+            pendingElement = document.createElement("article");
+            pendingElement.className = "message";
+            pendingElement.dataset.role = "assistant";
+            pendingElement.innerHTML = `<div aria-hidden="true" class="assistant-avatar">小</div><div class="message-content"><div class="message-name">小爱正在思考</div><div aria-label="正在生成回复" class="thinking"><i></i><i></i><i></i></div></div>`;
+            elements.conversation.append(pendingElement);
+            scrollToBottom();
+        }
+
+        function updateComposer() {
+            elements.prompt.style.height = "auto";
+            elements.prompt.style.height = `${Math.min(elements.prompt.scrollHeight, 170)}px`;
+            elements.sendButton.disabled = !elements.prompt.value.trim() && !activeController;
+        }
+
+        function setRunning(running) {
+            elements.prompt.disabled = running;
+            elements.sendButton.disabled = false;
+            elements.sendButton.dataset.running = String(running);
+            elements.sendButton.type = running ? "button" : "submit";
+            elements.sendButton.textContent = running ? "停止" : "↑";
+            elements.sendButton.setAttribute("aria-label", running ? "停止生成" : "发送消息");
+            if (!running) {
+                updateComposer();
+            }
+        }
+
+        async function parseResponse(response) {
+            const raw = await response.text();
+            let payload;
+            try {
+                payload = raw ? JSON.parse(raw) : {};
+            } catch (error) {
+                payload = {message: raw || "服务暂时没有返回内容"};
+            }
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || `请求失败（${response.status}）`);
+            }
+            return payload;
+        }
+
+        async function sendMessage(input) {
+            const conversation = currentConversation();
+            if (!conversation || activeController) {
+                return;
+            }
+
+            conversation.messages.push({role: "user", content: input});
+            if (conversation.title === "新对话") {
+                conversation.title = input.length > 24 ? `${input.slice(0, 24)}…` : input;
+            }
+            conversation.updatedAt = Date.now();
+            saveState();
+            renderConversation();
+            addThinking();
+            activeController = new AbortController();
+            setRunning(true);
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({input, sessionId: conversation.sessionId}),
+                    signal: activeController.signal
+                });
+                const payload = await parseResponse(response);
+                conversation.sessionId = payload.sessionId || conversation.sessionId;
+                conversation.messages.push({
+                    role: "assistant",
+                    content: payload.finalOutput ?? "暂时没有可显示的回复",
+                    usage: normalizeUsage(payload.usage)
+                });
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    showToast("已停止生成");
+                } else {
+                    conversation.messages.push({role: "error", content: "暂时无法连接服务，请稍后再试。"});
+                    showToast("连接失败，请检查服务状态");
+                }
+            } finally {
+                pendingElement?.remove();
+                pendingElement = null;
+                activeController = null;
+                conversation.updatedAt = Date.now();
+                saveState();
+                renderConversation();
+                setRunning(false);
+                elements.prompt.focus();
+            }
+        }
+
+        function submitPrompt() {
+            const input = elements.prompt.value.trim();
+            if (!input || activeController) {
+                return;
+            }
+            elements.prompt.value = "";
+            updateComposer();
+            void sendMessage(input);
+        }
+
+        function startNewChat() {
+            if (activeController) {
+                showToast("请先停止当前回复");
+                return;
+            }
+            const current = currentConversation();
+            if (current?.messages.length === 0) {
+                elements.prompt.focus();
+                setSidebar(false);
+                return;
+            }
+            const conversation = createConversation();
+            state.conversations.unshift(conversation);
+            state.activeId = conversation.id;
+            saveState();
+            renderConversation();
+            setSidebar(false);
+            elements.prompt.focus();
+        }
+
+        function switchConversation(id) {
+            if (activeController || id === state.activeId) {
+                return;
+            }
+            state.activeId = id;
+            saveState();
+            renderConversation();
+            setSidebar(false);
+        }
+
+        function deleteConversation(id) {
+            if (activeController) {
+                showToast("请先停止当前回复");
+                return;
+            }
+            state.conversations = state.conversations.filter((item) => item.id !== id);
+            if (state.activeId === id || !currentConversation()) {
+                const replacement = state.conversations[0] || createConversation();
+                if (state.conversations.length === 0) {
+                    state.conversations.push(replacement);
+                }
+                state.activeId = replacement.id;
+            }
+            saveState();
+            renderConversation();
+            showToast("对话已删除");
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.dataset.theme = theme;
+            elements.themeToggle.textContent = theme === "dark" ? "☀" : "☾";
+            elements.themeToggle.setAttribute("aria-label", theme === "dark" ? "切换浅色模式" : "切换深色模式");
+            document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#171718" : "#f7f5f0";
+        }
+
+        elements.composer.addEventListener("submit", (event) => {
+            event.preventDefault();
+            submitPrompt();
+        });
+
+        elements.sendButton.addEventListener("click", () => {
+            if (activeController) {
+                activeController.abort();
+            }
+        });
+
+        elements.prompt.addEventListener("input", updateComposer);
+        elements.prompt.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+                event.preventDefault();
+                submitPrompt();
+            }
+        });
+
+        elements.conversation.addEventListener("click", async (event) => {
+            const suggestion = event.target.closest("[data-prompt]");
+            if (suggestion) {
+                elements.prompt.value = suggestion.dataset.prompt;
+                updateComposer();
+                elements.prompt.focus();
+                return;
+            }
+            const copyButton = event.target.closest("[data-copy-index]");
+            if (copyButton) {
+                const message = currentConversation()?.messages[Number(copyButton.dataset.copyIndex)];
+                try {
+                    await navigator.clipboard.writeText(message?.content || "");
+                    showToast("回复已复制");
+                } catch (error) {
+                    showToast("复制失败，请手动选择文字");
+                }
+            }
+        });
+
+        elements.history.addEventListener("click", (event) => {
+            const deleteButton = event.target.closest("[data-delete-id]");
+            if (deleteButton) {
+                deleteConversation(deleteButton.dataset.deleteId);
+                return;
+            }
+            const openButton = event.target.closest("[data-conversation-id]");
+            if (openButton) {
+                switchConversation(openButton.dataset.conversationId);
+            }
+        });
+
+        elements.newChat.addEventListener("click", startNewChat);
+        elements.mobileNewChat.addEventListener("click", startNewChat);
+        elements.menuButton.addEventListener("click", () => setSidebar(elements.body.dataset.sidebarOpen !== "true"));
+        elements.sidebarBackdrop.addEventListener("click", () => setSidebar(false));
+        elements.themeToggle.addEventListener("click", () => {
+            const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+            localStorage.setItem(THEME_KEY, next);
+            applyTheme(next);
+        });
+
+        const preferredTheme = localStorage.getItem(THEME_KEY) ||
+            (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        applyTheme(preferredTheme);
+        loadState();
+        saveState();
+        renderConversation();
+        updateComposer();
+        elements.prompt.focus();
+    })();
+</script>
+</body>
+</html>

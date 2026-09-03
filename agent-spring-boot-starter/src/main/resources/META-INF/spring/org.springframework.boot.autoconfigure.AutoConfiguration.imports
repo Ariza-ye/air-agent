@@ -1,0 +1,4 @@
+com.ariza.agent.spring.session.PgSessionAutoConfiguration
+com.ariza.agent.spring.session.MysqlSessionAutoConfiguration
+com.ariza.agent.spring.session.SessionAutoConfiguration
+com.ariza.agent.spring.AgentsAutoConfiguration

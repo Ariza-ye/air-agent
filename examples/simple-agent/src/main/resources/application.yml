@@ -1,0 +1,7 @@
+agents:
+  ai:
+    api-key: ${OPENAI_API_KEY:}
+    default-model: ${OPENAI_MODEL:gpt-4.1-mini}
+    endpoint: ${OPENAI_BASE_URL:}
+  session:
+    type: ${AGENTS_SESSION_TYPE:memory}
