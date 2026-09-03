@@ -5,7 +5,7 @@ Spring Boot 自动配置。
 
 当前内置两个模型适配器：
 
-- OpenAI Responses API；
+- OpenAI Chat Completions API；
 - Anthropic Messages API。
 
 `Runner` 与模型提供商解耦，可以在一次运行内完成“模型请求 → 工具调用 → 工具结果回传 → 最终文本”的循环。
@@ -31,7 +31,7 @@ mvn -version
 ```text
 agent-java/
 ├── agent-core/                 # Agent Runtime 核心契约与 Runner
-├── agent-model-openai/         # OpenAI Responses API 适配器
+├── agent-model-openai/         # OpenAI Chat Completions API 适配器
 ├── agent-model-anthropic/      # Anthropic Messages API 适配器
 ├── agent-tool-reflect/         # 注解式 Java 方法工具
 ├── agent-session/              # 内存和 PostgreSQL 会话存储
@@ -41,16 +41,16 @@ agent-java/
 └── pom.xml                      # Maven 父项目
 ```
 
-| 模块                                                          | 主要职责                                            | 关键类型                                                                  |
-|-------------------------------------------------------------|-------------------------------------------------|-----------------------------------------------------------------------|
-| [`agent-core`](agent-core/)                                 | Agent、运行器、模型、工具、护栏、会话、追踪和任务移交契约                 | `Agent`、`Runner`、`ModelClient`、`Tool`、`TraceExporter`                 |
-| [`agent-model-openai`](agent-model-openai/)                 | OpenAI Responses API 请求、文本解析、工具调用与 continuation | `OpenAIModelClient`                                                   |
-| [`agent-model-anthropic`](agent-model-anthropic/)           | Anthropic Messages API 请求、内容块解析、工具调用与消息续传       | `AnthropicModelClient`                                                |
-| [`agent-tool-reflect`](agent-tool-reflect/)                 | 从 Java 方法生成工具、参数 Schema 和返回字段说明                 | `ReflectionToolFactory`、`AgentTool`、`ToolParam`、`ToolResultField`     |
-| [`agent-session`](agent-session/)                           | JVM 内、PostgreSQL 和 MySQL 会话消息存储                 | `InMemorySessionStore`、`PgSessionStore`、`MysqlSessionStore`           |
-| [`agent-tracing`](agent-tracing/)                           | 追踪导出实现                                          | `LogTraceExporter`                                                    |
-| [`agent-spring-boot-starter`](agent-spring-boot-starter/)   | 默认 OpenAI 客户端、Runner 和配置绑定                      | `AgentsAutoConfiguration`、`AgentsProperties`                          |
-| [`examples/simple-agent`](examples/simple-agent/)           | OpenAI 客户端、Spring 工具扫描和 HTTP 入口                 | `SimpleAgentApplication`、`AgentsConfiguration`、`TestTool`             |
+| 模块                                                        | 主要职责                                      | 关键类型                                                              |
+|-----------------------------------------------------------|-------------------------------------------|-------------------------------------------------------------------|
+| [`agent-core`](agent-core/)                               | Agent、运行器、模型、工具、护栏、会话、追踪和任务移交契约           | `Agent`、`Runner`、`ModelClient`、`Tool`、`TraceExporter`             |
+| [`agent-model-openai`](agent-model-openai/)               | OpenAI Chat Completions 请求、消息解析、工具调用与消息续传 | `OpenAIModelClient`                                               |
+| [`agent-model-anthropic`](agent-model-anthropic/)         | Anthropic Messages API 请求、内容块解析、工具调用与消息续传 | `AnthropicModelClient`                                            |
+| [`agent-tool-reflect`](agent-tool-reflect/)               | 从 Java 方法生成工具、参数 Schema 和返回字段说明           | `ReflectionToolFactory`、`AgentTool`、`ToolParam`、`ToolResultField` |
+| [`agent-session`](agent-session/)                         | JVM 内、PostgreSQL 和 MySQL 会话消息存储           | `InMemorySessionStore`、`PgSessionStore`、`MysqlSessionStore`       |
+| [`agent-tracing`](agent-tracing/)                         | 追踪导出实现                                    | `LogTraceExporter`                                                |
+| [`agent-spring-boot-starter`](agent-spring-boot-starter/) | 默认 OpenAI 客户端、Runner 和配置绑定                | `AgentsAutoConfiguration`、`AgentsProperties`                      |
+| [`examples/simple-agent`](examples/simple-agent/)         | OpenAI 客户端、Spring 工具扫描和 HTTP 入口           | `SimpleAgentApplication`、`AgentsConfiguration`、`TestTool`         |
 
 ```mermaid
 flowchart TD
@@ -84,7 +84,7 @@ mvn clean install
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
 export OPENAI_MODEL="gpt-4.1-mini" # 可选
-export OPENAI_BASE_URL="https://api.openai.com/v1/responses" # 可选，覆盖默认完整 API 地址
+export OPENAI_BASE_URL="https://api.openai.com/v1/chat/completions" # 可选，覆盖默认完整 API 地址
 mvn -f examples/simple-agent/pom.xml spring-boot:run
 ```
 
@@ -255,12 +255,12 @@ var agent = Agent.builder()
 
 ### OpenAI
 
-`OpenAIModelClient` 默认调用 `https://api.openai.com/v1/responses`，支持：
+`OpenAIModelClient` 默认调用 `https://api.openai.com/v1/chat/completions`，支持：
 
-- Responses API 文本输出；
+- Chat Completions 消息序列化与文本输出；
 - function 工具定义和工具调用解析；
-- 通过 response id continuation 回传工具结果；
-- 非 2xx、无效响应和中断处理。
+- 通过累积消息 continuation 回传工具结果；
+- 完成原因、缓存 token、推理 token、非 2xx、无效响应和中断处理。
 
 ```java
 ModelClient client = new OpenAIModelClient(System.getenv("OPENAI_API_KEY"));

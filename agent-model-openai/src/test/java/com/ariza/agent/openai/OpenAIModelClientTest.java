@@ -44,32 +44,36 @@ class OpenAIModelClientTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void serializesUserInputAndToolsAndParsesFunctionCalls() throws Exception {
+    void serializesMessagesAndToolsAndParsesToolCalls() throws Exception {
         String responseBody = """
                 {
-                  "id": "resp_123",
-                  "status": "completed",
-                  "output": [
+                  "id": "chatcmpl-123",
+                  "choices": [
                     {
-                      "type": "message",
-                      "content": [
-                        {"type": "output_text", "text": "正在查询。"}
-                      ]
-                    },
-                    {
-                      "type": "function_call",
-                      "id": "fc_123",
-                      "call_id": "call_123",
-                      "name": "get_weather",
-                      "arguments": "{\\\"location\\\":\\\"Singapore\\\"}"
+                      "index": 0,
+                      "finish_reason": "tool_calls",
+                      "message": {
+                        "role": "assistant",
+                        "content": "正在查询。",
+                        "tool_calls": [
+                          {
+                            "id": "call_123",
+                            "type": "function",
+                            "function": {
+                              "name": "get_weather",
+                              "arguments": "{\\\"location\\\":\\\"Singapore\\\"}"
+                            }
+                          }
+                        ]
+                      }
                     }
                   ],
                   "usage": {
-                    "input_tokens": 20,
-                    "output_tokens": 8,
+                    "prompt_tokens": 20,
+                    "completion_tokens": 8,
                     "total_tokens": 28,
-                    "input_tokens_details": {"cached_tokens": 5},
-                    "output_tokens_details": {"reasoning_tokens": 3}
+                    "prompt_tokens_details": {"cached_tokens": 5},
+                    "completion_tokens_details": {"reasoning_tokens": 3}
                   }
                 }
                 """;
@@ -86,37 +90,48 @@ class OpenAIModelClientTest {
 
         JsonNode request = objectMapper.readTree(httpClient.requestBody());
         assertEquals("test-model", request.path("model").asText());
-        assertEquals("You are helpful.", request.path("instructions").asText());
-        assertEquals("user", request.path("input").get(0).path("role").asText());
-        assertEquals("新加坡天气如何？", request.path("input").get(0).path("content").asText());
+        assertEquals("system", request.path("messages").get(0).path("role").asText());
+        assertEquals("You are helpful.", request.path("messages").get(0).path("content").asText());
+        assertEquals("user", request.path("messages").get(1).path("role").asText());
+        assertEquals("新加坡天气如何？", request.path("messages").get(1).path("content").asText());
         assertEquals("function", request.path("tools").get(0).path("type").asText());
-        assertEquals("get_weather", request.path("tools").get(0).path("name").asText());
-        assertEquals("object", request.path("tools").get(0).path("parameters").path("type").asText());
+        assertEquals("get_weather", request.path("tools").get(0).path("function").path("name").asText());
+        assertEquals("object", request.path("tools").get(0).path("function").path("parameters").path("type").asText());
         assertEquals("Bearer test-key", httpClient.authorization());
 
         assertEquals("正在查询。", response.text());
         assertEquals(1, response.toolCalls().size());
         assertEquals("call_123", response.toolCalls().get(0).callId());
-        assertEquals("fc_123", response.toolCalls().get(0).itemId());
+        assertEquals("call_123", response.toolCalls().get(0).itemId());
         assertEquals("get_weather", response.toolCalls().get(0).name());
         assertEquals("Singapore", response.toolCalls().get(0).arguments().path("location").asText());
-        assertEquals(new ModelContinuation("openai", "resp_123"), response.continuation());
+        assertNotNull(response.continuation());
+        assertEquals("openai", response.continuation().provider());
+        JsonNode continuedMessages = objectMapper.readTree(response.continuation().token());
+        assertEquals(3, continuedMessages.size());
+        assertEquals("assistant", continuedMessages.get(2).path("role").asText());
+        assertEquals("get_weather", continuedMessages.get(2).path("tool_calls").get(0).path("function").path("name").asText());
         assertEquals(ModelStatus.COMPLETED, response.status());
         assertEquals(new ModelUsage(20, 8, 28, 5, 3), response.usage());
     }
 
     @Test
-    void serializesToolOutputWithPreviousResponseId() throws Exception {
+    void serializesToolOutputIntoContinuedMessages() throws Exception {
+        String continuedMessages = """
+                [
+                  {"role":"system","content":"You are helpful."},
+                  {"role":"user","content":"新加坡天气如何？"},
+                  {"role":"assistant","tool_calls":[{"id":"call_123","type":"function","function":{"name":"get_weather","arguments":"{\\\"location\\\":\\\"Singapore\\\"}"}}]}
+                ]
+                """;
         String responseBody = """
                 {
-                  "id": "resp_456",
-                  "status": "completed",
-                  "output": [
+                  "id": "chatcmpl-456",
+                  "choices": [
                     {
-                      "type": "message",
-                      "content": [
-                        {"type": "output_text", "text": "新加坡现在是 30°C。"}
-                      ]
+                      "index": 0,
+                      "finish_reason": "stop",
+                      "message": {"role": "assistant", "content": "新加坡现在是 30°C。"}
                     }
                   ]
                 }
@@ -129,27 +144,64 @@ class OpenAIModelClientTest {
                 "You are helpful.",
                 List.of(new ToolOutput("call_123", "{\"temperature\":30}")),
                 List.of(weatherTool()),
-                new ModelContinuation("openai", "resp_123")
+                new ModelContinuation("openai", continuedMessages)
         ));
 
         JsonNode request = objectMapper.readTree(httpClient.requestBody());
-        JsonNode toolOutput = request.path("input").get(0);
-        assertEquals("resp_123", request.path("previous_response_id").asText());
-        assertEquals("function_call_output", toolOutput.path("type").asText());
-        assertEquals("call_123", toolOutput.path("call_id").asText());
-        assertEquals("{\"temperature\":30}", toolOutput.path("output").asText());
+        assertEquals(4, request.path("messages").size());
+        JsonNode toolMessage = request.path("messages").get(3);
+        assertEquals("tool", toolMessage.path("role").asText());
+        assertEquals("call_123", toolMessage.path("tool_call_id").asText());
+        assertEquals("{\"temperature\":30}", toolMessage.path("content").asText());
         assertEquals("新加坡现在是 30°C。", response.text());
         assertTrue(response.toolCalls().isEmpty());
+        assertNull(response.continuation());
+        assertEquals(ModelStatus.COMPLETED, response.status());
     }
 
     @Test
-    void mapsIncompleteStatusAndReason() throws Exception {
+    void parsesTextOnlyCompletionWithoutUsage() throws Exception {
         String responseBody = """
                 {
-                  "id": "resp_incomplete",
-                  "status": "incomplete",
-                  "incomplete_details": {"reason": "max_output_tokens"},
-                  "output": []
+                  "id": "chatcmpl-text",
+                  "choices": [
+                    {
+                      "index": 0,
+                      "finish_reason": "stop",
+                      "message": {"role": "assistant", "content": "你好"}
+                    }
+                  ]
+                }
+                """;
+
+        StubHttpClient httpClient = new StubHttpClient(200, responseBody);
+        ModelResponse response = client(httpClient).call(new ModelRequest(
+                "test-model",
+                "help",
+                "hello",
+                List.of(),
+                null
+        ));
+
+        assertEquals("你好", response.text());
+        assertTrue(response.toolCalls().isEmpty());
+        assertNull(response.continuation());
+        assertEquals(ModelStatus.COMPLETED, response.status());
+        assertEquals(ModelUsage.zero(), response.usage());
+    }
+
+    @Test
+    void mapsIncompleteLengthStatusAndReason() throws Exception {
+        String responseBody = """
+                {
+                  "id": "chatcmpl-len",
+                  "choices": [
+                    {
+                      "index": 0,
+                      "finish_reason": "length",
+                      "message": {"role": "assistant", "content": "部分输出"}
+                    }
+                  ]
                 }
                 """;
 
@@ -163,7 +215,7 @@ class OpenAIModelClientTest {
         ));
 
         assertEquals(ModelStatus.INCOMPLETE, response.status());
-        assertEquals("max_output_tokens", response.incompleteReason());
+        assertEquals("length", response.incompleteReason());
     }
 
     @Test
@@ -196,7 +248,7 @@ class OpenAIModelClientTest {
     private OpenAIModelClient client(HttpClient httpClient) {
         return new OpenAIModelClient(
                 "test-key",
-                URI.create("https://example.test/v1/responses"),
+                URI.create("https://example.test/v1/chat/completions"),
                 httpClient,
                 objectMapper
         );

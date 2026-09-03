@@ -6,9 +6,6 @@ import com.ariza.agent.tool.reflect.ToolParam;
 import com.ariza.agent.tool.reflect.ToolResultField;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -42,36 +39,36 @@ public class TestTool {
         return sdf.format(new Date());
     }
 
-    @AgentTool(name = "run_cmd", description = "可以执行命令行脚本")
-    public String runCmd(
-            @ToolParam(value = "cmd_content", description = "命令内容") String[] cmd) throws IOException {
-        if (cmd == null || cmd.length == 0 || cmd[0] == null || cmd[0].isBlank()) {
-            throw new IllegalArgumentException("命令内容不能为空");
-        }
-        if (Arrays.stream(cmd).anyMatch(argument -> argument == null)) {
-            throw new IllegalArgumentException("命令参数不能为 null");
-        }
-
-        Process process = new ProcessBuilder(Arrays.copyOf(cmd, cmd.length))
-                .redirectErrorStream(true)
-                .start();
-        try (InputStream outputStream = process.getInputStream()) {
-            String output = new String(outputStream.readAllBytes(), Charset.defaultCharset());
-            int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                return output;
-            }
-            String result = "命令执行失败，退出码: " + exitCode;
-            return output.isBlank() ? result : result + System.lineSeparator() + output;
-        } catch (InterruptedException exception) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-            throw new IOException("等待命令执行时线程被中断", exception);
-        } catch (IOException exception) {
-            process.destroyForcibly();
-            throw exception;
-        }
-    }
+//    @AgentTool(name = "run_cmd", description = "可以执行命令行脚本")
+//    public String runCmd(
+//            @ToolParam(value = "cmd_content", description = "命令内容") String[] cmd) throws IOException {
+//        if (cmd == null || cmd.length == 0 || cmd[0] == null || cmd[0].isBlank()) {
+//            throw new IllegalArgumentException("命令内容不能为空");
+//        }
+//        if (Arrays.stream(cmd).anyMatch(argument -> argument == null)) {
+//            throw new IllegalArgumentException("命令参数不能为 null");
+//        }
+//
+//        Process process = new ProcessBuilder(Arrays.copyOf(cmd, cmd.length))
+//                .redirectErrorStream(true)
+//                .start();
+//        try (InputStream outputStream = process.getInputStream()) {
+//            String output = new String(outputStream.readAllBytes(), Charset.defaultCharset());
+//            int exitCode = process.waitFor();
+//            if (exitCode == 0) {
+//                return output;
+//            }
+//            String result = "命令执行失败，退出码: " + exitCode;
+//            return output.isBlank() ? result : result + System.lineSeparator() + output;
+//        } catch (InterruptedException exception) {
+//            process.destroyForcibly();
+//            Thread.currentThread().interrupt();
+//            throw new IOException("等待命令执行时线程被中断", exception);
+//        } catch (IOException exception) {
+//            process.destroyForcibly();
+//            throw exception;
+//        }
+//    }
 
 
     /**

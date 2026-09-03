@@ -8,7 +8,7 @@
 ## 模块结构
 
 - `agent-core`：Agent、Runner、模型请求/响应、工具、护栏、会话和任务移交等核心契约。
-- `agent-model-openai`：OpenAI Responses API 适配器，支持文本和 function tool call。
+- `agent-model-openai`：OpenAI Chat Completions API 适配器，支持文本和 function tool call。
 - `agent-model-anthropic`：Anthropic Messages API 适配器，支持文本和工具调用。
 - `agent-tool-reflect`：通过 `@AgentTool`、`@ToolParam` 和 `@ToolResultField` 把 Java 方法转换为工具。
 - `agent-session`：进程内 `InMemorySessionStore`。

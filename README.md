@@ -6,7 +6,7 @@ Java Agents is a lightweight Agent Runtime for Java 17 and Spring Boot 3. It pro
 
 Two model adapters are currently built in:
 
-- OpenAI Responses API;
+- OpenAI Chat Completions API;
 - Anthropic Messages API.
 
 `Runner` is decoupled from model providers and can complete the “model request → tool call → tool result → final text” loop within a single run.
@@ -32,7 +32,7 @@ Run all commands below from the repository root.
 ```text
 agent-java/
 ├── agent-core/                 # Core Agent Runtime contracts and Runner
-├── agent-model-openai/         # OpenAI Responses API adapter
+├── agent-model-openai/         # OpenAI Chat Completions API adapter
 ├── agent-model-anthropic/      # Anthropic Messages API adapter
 ├── agent-tool-reflect/         # Annotation-based Java method tools
 ├── agent-session/              # In-memory and PostgreSQL session storage
@@ -42,16 +42,16 @@ agent-java/
 └── pom.xml                      # Parent Maven project
 ```
 
-| Module                                                      | Main responsibility                                                                   | Key types                                                                |
-|-------------------------------------------------------------|---------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| [`agent-core`](agent-core/)                                 | Agent, runner, model, tool, guardrail, session, tracing, and handoff contracts        | `Agent`, `Runner`, `ModelClient`, `Tool`, `TraceExporter`                |
-| [`agent-model-openai`](agent-model-openai/)                 | OpenAI Responses API requests, text parsing, tool calls, and continuation             | `OpenAIModelClient`                                                      |
-| [`agent-model-anthropic`](agent-model-anthropic/)           | Anthropic Messages API requests, content blocks, tool calls, and message continuation | `AnthropicModelClient`                                                   |
-| [`agent-tool-reflect`](agent-tool-reflect/)                 | Generate tools, parameter schemas, and result-field descriptions from Java methods    | `ReflectionToolFactory`, `AgentTool`, `ToolParam`, `ToolResultField`     |
-| [`agent-session`](agent-session/)                           | In-JVM, PostgreSQL, and MySQL session message storage                                 | `InMemorySessionStore`, `PgSessionStore`, `MysqlSessionStore`            |
-| [`agent-tracing`](agent-tracing/)                           | Tracing exporter implementations                                                      | `LogTraceExporter`                                                       |
-| [`agent-spring-boot-starter`](agent-spring-boot-starter/)   | Default OpenAI client, Runner, and configuration binding                              | `AgentsAutoConfiguration`, `AgentsProperties`                            |
-| [`examples/simple-agent`](examples/simple-agent/)           | OpenAI client, Spring tool scanning, and HTTP entry point                             | `SimpleAgentApplication`, `AgentsConfiguration`, `TestTool`              |
+| Module                                                    | Main responsibility                                                                     | Key types                                                            |
+|-----------------------------------------------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| [`agent-core`](agent-core/)                               | Agent, runner, model, tool, guardrail, session, tracing, and handoff contracts          | `Agent`, `Runner`, `ModelClient`, `Tool`, `TraceExporter`            |
+| [`agent-model-openai`](agent-model-openai/)               | OpenAI Chat Completions requests, message parsing, tool calls, and message continuation | `OpenAIModelClient`                                                  |
+| [`agent-model-anthropic`](agent-model-anthropic/)         | Anthropic Messages API requests, content blocks, tool calls, and message continuation   | `AnthropicModelClient`                                               |
+| [`agent-tool-reflect`](agent-tool-reflect/)               | Generate tools, parameter schemas, and result-field descriptions from Java methods      | `ReflectionToolFactory`, `AgentTool`, `ToolParam`, `ToolResultField` |
+| [`agent-session`](agent-session/)                         | In-JVM, PostgreSQL, and MySQL session message storage                                   | `InMemorySessionStore`, `PgSessionStore`, `MysqlSessionStore`        |
+| [`agent-tracing`](agent-tracing/)                         | Tracing exporter implementations                                                        | `LogTraceExporter`                                                   |
+| [`agent-spring-boot-starter`](agent-spring-boot-starter/) | Default OpenAI client, Runner, and configuration binding                                | `AgentsAutoConfiguration`, `AgentsProperties`                        |
+| [`examples/simple-agent`](examples/simple-agent/)         | OpenAI client, Spring tool scanning, and HTTP entry point                               | `SimpleAgentApplication`, `AgentsConfiguration`, `TestTool`          |
 
 ```mermaid
 flowchart TD
@@ -86,7 +86,7 @@ The example application explicitly registers `OpenAIModelClient` and reads its c
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
 export OPENAI_MODEL="gpt-4.1-mini" # Optional
-export OPENAI_BASE_URL="https://api.openai.com/v1/responses" # Optional; overrides the complete default API URL
+export OPENAI_BASE_URL="https://api.openai.com/v1/chat/completions" # Optional; overrides the complete default API URL
 mvn -f examples/simple-agent/pom.xml spring-boot:run
 ```
 
@@ -254,12 +254,12 @@ Rules:
 
 ### OpenAI
 
-`OpenAIModelClient` calls `https://api.openai.com/v1/responses` by default and supports:
+`OpenAIModelClient` calls `https://api.openai.com/v1/chat/completions` by default and supports:
 
-- Responses API text output;
+- Chat Completions message serialization and text output;
 - function tool definitions and tool-call parsing;
-- tool-result continuation through a response ID;
-- non-2xx responses, invalid responses, and thread interruption handling.
+- tool-result continuation through accumulated messages;
+- finish reasons, cached and reasoning tokens, non-2xx responses, invalid responses, and thread interruption handling.
 
 ```java
 ModelClient client = new OpenAIModelClient(System.getenv("OPENAI_API_KEY"));

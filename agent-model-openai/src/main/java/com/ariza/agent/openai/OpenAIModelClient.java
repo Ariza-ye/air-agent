@@ -29,12 +29,12 @@ public final class OpenAIModelClient implements ModelClient {
     private final ObjectMapper objectMapper;
 
     /**
-     * 使用 OpenAI Responses API 默认地址和标准 HTTP 组件创建模型客户端。
+     * 使用 OpenAI Chat Completions API 默认地址和标准 HTTP 组件创建模型客户端。
      *
      * @param apiKey 用于调用 OpenAI API 的密钥
      */
     public OpenAIModelClient(String apiKey) {
-        this(apiKey, URI.create("https://api.openai.com/v1/responses"), HttpClient.newHttpClient(), new ObjectMapper());
+        this(apiKey, URI.create("https://api.openai.com/v1/chat/completions"), HttpClient.newHttpClient(), new ObjectMapper());
     }
 
     /**
@@ -44,7 +44,7 @@ public final class OpenAIModelClient implements ModelClient {
      * @param endpoint 模型 API 地址
      */
     public OpenAIModelClient(String apiKey, URI endpoint) {
-        this(apiKey, Objects.isNull(endpoint) ? URI.create("https://api.openai.com/v1/responses") : endpoint, HttpClient.newHttpClient(), new ObjectMapper());
+        this(apiKey, Objects.isNull(endpoint) ? URI.create("https://api.openai.com/v1/chat/completions") : endpoint, HttpClient.newHttpClient(), new ObjectMapper());
     }
 
     /**
@@ -83,7 +83,7 @@ public final class OpenAIModelClient implements ModelClient {
     }
 
     /**
-     * 调用 OpenAI Responses API，并解析输出文本、函数调用、续传信息及响应状态。
+     * 调用 OpenAI Chat Completions API，并解析输出文本、函数调用、续传信息及响应状态。
      *
      * @param request 模型名称、指令、输入及可用工具组成的请求
      * @return 规范化后的模型响应
@@ -94,6 +94,7 @@ public final class OpenAIModelClient implements ModelClient {
         Objects.requireNonNull(request, "request");
         try {
             ObjectNode body = createRequestBody(request);
+            ArrayNode requestMessages = (ArrayNode) body.get("messages");
             HttpRequest httpRequest = HttpRequest.newBuilder(endpoint)
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
@@ -103,7 +104,7 @@ public final class OpenAIModelClient implements ModelClient {
             if (response.statusCode() / 100 != 2) {
                 throw new AgentRunException(formatHttpError(response));
             }
-            return parseResponse(objectMapper.readTree(response.body()));
+            return parseResponse(objectMapper.readTree(response.body()), requestMessages);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AgentRunException("OpenAI API 请求被中断", e);
@@ -115,32 +116,21 @@ public final class OpenAIModelClient implements ModelClient {
     }
 
     /**
-     * 将通用模型请求转换为 OpenAI Responses API 请求体。
+     * 将通用模型请求转换为 OpenAI Chat Completions API 请求体。
      *
-     * <p>该方法负责序列化本轮输入、可用工具，并在续传请求中写入
-     * {@code previous_response_id}。</p>
+     * <p>Chat Completions 是无状态协议，每条消息都必须完整携带。首次请求构建
+     * {@code system} 指令与输入消息；续传请求从 continuation 令牌恢复已有消息
+     * 并追加本轮输入（通常为工具执行结果）。</p>
      *
      * @param request 通用模型请求
-     * @return 可直接发送给 OpenAI Responses API 的 JSON 请求体
-     * @throws AgentRunException 当续传信息不属于 OpenAI 或续传令牌为空时抛出
+     * @return 可直接发送给 OpenAI Chat Completions API 的 JSON 请求体
+     * @throws AgentRunException 当续传信息不属于 OpenAI 或续传令牌无效时抛出
      */
     private ObjectNode createRequestBody(ModelRequest request) {
         ObjectNode body = objectMapper.createObjectNode()
-                .put("model", request.model())
-                .put("instructions", request.instructions());
+                .put("model", request.model());
 
-        ArrayNode input = body.putArray("input");
-        for (ModelInputItem item : request.input()) {
-            input.add(serializeInputItem(item));
-        }
-
-        if (!request.tools().isEmpty()) {
-            ArrayNode tools = body.putArray("tools");
-            for (Tool tool : request.tools()) {
-                tools.add(serializeTool(tool));
-            }
-        }
-
+        ArrayNode messages = objectMapper.createArrayNode();
         ModelContinuation continuation = request.continuation();
         if (continuation != null) {
             if (!PROVIDER.equals(continuation.provider())) {
@@ -149,97 +139,158 @@ public final class OpenAIModelClient implements ModelClient {
             if (continuation.token() == null || continuation.token().isBlank()) {
                 throw new AgentRunException("OpenAI continuation token 不能为空");
             }
-            body.put("previous_response_id", continuation.token());
+            try {
+                JsonNode restored = objectMapper.readTree(continuation.token());
+                if (restored == null || !restored.isArray()) {
+                    throw new AgentRunException("OpenAI continuation 消息不是合法 JSON 数组");
+                }
+                messages = (ArrayNode) restored;
+            } catch (AgentRunException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new AgentRunException("OpenAI continuation 消息解析失败", e);
+            }
+        } else {
+            messages.add(message("system", request.instructions()));
+        }
+
+        for (ModelInputItem item : request.input()) {
+            messages.add(serializeInputItem(item));
+        }
+        body.set("messages", messages);
+
+        if (!request.tools().isEmpty()) {
+            ArrayNode tools = body.putArray("tools");
+            for (Tool tool : request.tools()) {
+                tools.add(serializeTool(tool));
+            }
         }
 
         return body;
     }
 
     /**
-     * 将单个通用模型输入项转换为 OpenAI Responses API 输入项。
+     * 将单个通用模型输入项转换为 OpenAI Chat Completions 消息。
      *
-     * @param item 用户输入或工具执行结果
-     * @return OpenAI 格式的 JSON 输入项
+     * @param item 用户输入、AI 回复或工具执行结果
+     * @return OpenAI 格式的 JSON 消息
      * @throws NullPointerException 当输入项或其必填字段为 {@code null} 时抛出
      * @throws AgentRunException    当输入项类型不受支持时抛出
      */
     private ObjectNode serializeInputItem(ModelInputItem item) {
         Objects.requireNonNull(item, "model input item");
         if (item instanceof UserInput userInput) {
-            return objectMapper.createObjectNode()
-                    .put("role", "user")
-                    .put("content", Objects.requireNonNull(userInput.text(), "user input text"));
+            return message("user", Objects.requireNonNull(userInput.text(), "user input text"));
+        }
+        if (item instanceof AIInput assistantInput) {
+            return message("assistant", assistantInput.text());
         }
         if (item instanceof ToolOutput toolOutput) {
             return objectMapper.createObjectNode()
-                    .put("type", "function_call_output")
-                    .put("call_id", Objects.requireNonNull(toolOutput.callId(), "tool output callId"))
-                    .put("output", Objects.requireNonNull(toolOutput.output(), "tool output"));
-        }
-        if (item instanceof AIInput assistantInput) {
-            return objectMapper.createObjectNode()
-                    .put("role", "assistant")
-                    .put("content", assistantInput.text());
+                    .put("role", "tool")
+                    .put("tool_call_id", Objects.requireNonNull(toolOutput.callId(), "tool output callId"))
+                    .put("content", Objects.requireNonNull(toolOutput.output(), "tool output"));
         }
         throw new AgentRunException("不支持的模型输入类型: " + item.getClass().getName());
     }
 
     /**
-     * 将通用工具定义转换为 OpenAI function 工具定义。
+     * 创建带角色和内容的普通消息。
+     *
+     * @param role    消息角色
+     * @param content 消息内容；为空时使用空字符串
+     * @return 单条 JSON 消息
+     */
+    private ObjectNode message(String role, String content) {
+        return objectMapper.createObjectNode()
+                .put("role", role)
+                .put("content", content == null ? "" : content);
+    }
+
+    /**
+     * 将通用工具定义转换为 OpenAI Chat Completions function 工具定义。
      *
      * @param tool 要提供给模型调用的工具
-     * @return 包含工具名称、说明和参数 JSON Schema 的 OpenAI 工具对象
+     * @return 以 {@code function} 嵌套结构表示的 OpenAI 工具对象
      * @throws NullPointerException 当工具或工具必填字段为 {@code null} 时抛出
      */
     private ObjectNode serializeTool(Tool tool) {
         Objects.requireNonNull(tool, "tool");
         JsonNode inputSchema = Objects.requireNonNull(tool.inputSchema(), "tool inputSchema");
-        return objectMapper.createObjectNode()
-                .put("type", "function")
+        ObjectNode function = objectMapper.createObjectNode()
                 .put("name", Objects.requireNonNull(tool.name(), "tool name"))
                 .put("description", Objects.requireNonNull(tool.description(), "tool description"))
                 .set("parameters", inputSchema);
+        return objectMapper.createObjectNode()
+                .put("type", "function")
+                .set("function", function);
     }
 
     /**
-     * 将 OpenAI Responses API 响应转换为通用模型响应。
+     * 将 OpenAI Chat Completions API 响应转换为通用模型响应。
      *
-     * <p>解析内容包括输出文本、函数调用、响应状态、未完成原因和用于下一轮
-     * 请求的响应标识。</p>
+     * <p>解析内容包括输出文本、函数调用、完成原因和用于下一轮请求的续传消息。
+     * 当响应包含工具调用时，会把对应的 {@code assistant} 消息追加到请求消息并
+     * 序列化为续传令牌，供下一轮完整重发。</p>
      *
-     * @param json OpenAI Responses API 返回的 JSON 对象
+     * @param json            OpenAI Chat Completions API 返回的 JSON 对象
+     * @param requestMessages 本轮请求携带的完整消息数组
      * @return 规范化后的模型响应
      * @throws AgentRunException 当响应结构缺失必填字段或字段格式无效时抛出
      */
-    private ModelResponse parseResponse(JsonNode json) {
+    private ModelResponse parseResponse(JsonNode json, ArrayNode requestMessages) {
         if (json == null || !json.isObject()) {
             throw new AgentRunException("OpenAI API 返回了无效的 JSON 对象");
         }
 
-        StringBuilder text = new StringBuilder();
-        List<ToolCall> toolCalls = new ArrayList<>();
-        JsonNode outputItems = json.path("output");
-        if (!outputItems.isArray()) {
-            throw new AgentRunException("OpenAI API 响应缺少 output 数组");
+        JsonNode choices = json.path("choices");
+        if (!choices.isArray() || choices.isEmpty()) {
+            throw new AgentRunException("OpenAI API 响应缺少 choices 数组");
+        }
+        JsonNode message = choices.get(0).path("message");
+        if (!message.isObject()) {
+            throw new AgentRunException("OpenAI API 响应缺少 message 对象");
         }
 
-        for (JsonNode output : outputItems) {
-            String type = output.path("type").asText();
-            if ("message".equals(type)) {
-                appendOutputText(output, text);
-            } else if ("function_call".equals(type)) {
-                toolCalls.add(parseToolCall(output));
+        String text = message.path("content").asText();
+        List<ToolCall> toolCalls = parseToolCalls(message.path("tool_calls"));
+
+        ModelContinuation continuation = null;
+        if (!toolCalls.isEmpty()) {
+            requestMessages.add(assistantToolCallMessage(text, toolCalls));
+            try {
+                continuation = new ModelContinuation(PROVIDER, objectMapper.writeValueAsString(requestMessages));
+            } catch (Exception e) {
+                throw new AgentRunException("OpenAI continuation 序列化失败", e);
             }
         }
 
-        String responseId = requiredText(json, "id", "OpenAI API 响应缺少 id");
-        ModelContinuation continuation = new ModelContinuation(PROVIDER, responseId);
-        ModelStatus status = parseStatus(requiredText(json, "status", "OpenAI API 响应缺少 status"));
-        String reason = parseReason(json, status);
+        String finishReason = choiceFinishReason(choices.get(0));
+        ModelStatus status = parseStatus(finishReason);
+        String reason = status == ModelStatus.INCOMPLETE || status == ModelStatus.FAILED
+                ? finishReason
+                : null;
         ModelUsage usage = parseUsage(json.path("usage"));
-        return new ModelResponse(text.toString(), toolCalls, continuation, status, reason, usage);
+        return new ModelResponse(text, toolCalls, continuation, status, reason, usage);
     }
 
+    /**
+     * 读取单个 choice 的完成原因，缺失时返回空字符串。
+     *
+     * @param choice Chat Completions choice 节点
+     * @return 完成原因文本，可能为空字符串
+     */
+    private String choiceFinishReason(JsonNode choice) {
+        return choice.path("finish_reason").asText("");
+    }
+
+    /**
+     * 解析 Chat Completions 的 usage 对象。
+     *
+     * @param usage Chat Completions 返回的用量节点
+     * @return 规范化后的用量；缺失或为 {@code null} 时返回零用量
+     * @throws AgentRunException 当 usage 不是对象或必填字段格式无效时抛出
+     */
     private ModelUsage parseUsage(JsonNode usage) {
         if (usage.isMissingNode() || usage.isNull()) {
             return ModelUsage.zero();
@@ -248,11 +299,11 @@ public final class OpenAIModelClient implements ModelClient {
             throw new AgentRunException("OpenAI API 响应的 usage 必须是对象");
         }
         return new ModelUsage(
-                requiredNonNegativeLong(usage, "input_tokens"),
-                requiredNonNegativeLong(usage, "output_tokens"),
+                requiredNonNegativeLong(usage, "prompt_tokens"),
+                requiredNonNegativeLong(usage, "completion_tokens"),
                 requiredNonNegativeLong(usage, "total_tokens"),
-                optionalNonNegativeLong(usage.path("input_tokens_details"), "cached_tokens"),
-                optionalNonNegativeLong(usage.path("output_tokens_details"), "reasoning_tokens"));
+                optionalNonNegativeLong(usage.path("prompt_tokens_details"), "cached_tokens"),
+                optionalNonNegativeLong(usage.path("completion_tokens_details"), "reasoning_tokens"));
     }
 
     private long requiredNonNegativeLong(JsonNode node, String field) {
@@ -275,87 +326,82 @@ public final class OpenAIModelClient implements ModelClient {
     }
 
     /**
-     * 从 message 输出项中提取所有 {@code output_text} 内容并追加到文本缓冲区。
+     * 将 Chat Completions 的 {@code tool_calls} 数组转换为通用工具调用列表。
      *
-     * @param output OpenAI message 输出项
-     * @param text   用于累计模型可见文本的缓冲区
-     */
-    private void appendOutputText(JsonNode output, StringBuilder text) {
-        for (JsonNode content : output.path("content")) {
-            if ("output_text".equals(content.path("type").asText())) {
-                text.append(content.path("text").asText());
-            }
-        }
-    }
-
-    /**
-     * 将 OpenAI {@code function_call} 输出项转换为通用工具调用。
-     *
-     * @param output OpenAI function_call 输出项
-     * @return 包含调用标识、输出项标识、工具名称和参数的工具调用
+     * @param toolCalls 模型的函数调用节点；缺失或非数组时视为空
+     * @return 包含调用标识、工具名称和参数的通用工具调用列表
      * @throws AgentRunException 当必填字段缺失或 arguments 不是合法 JSON 对象时抛出
      */
-    private ToolCall parseToolCall(JsonNode output) {
-        String argumentsText = requiredText(
-                output,
-                "arguments",
-                "OpenAI function_call 缺少 arguments"
-        );
-        JsonNode arguments;
-        try {
-            arguments = objectMapper.readTree(argumentsText);
-        } catch (Exception e) {
-            throw new AgentRunException("OpenAI function_call arguments 不是合法 JSON", e);
+    private List<ToolCall> parseToolCalls(JsonNode toolCalls) {
+        List<ToolCall> result = new ArrayList<>();
+        if (!toolCalls.isArray()) {
+            return result;
         }
-        if (arguments == null || !arguments.isObject()) {
-            throw new AgentRunException("OpenAI function_call arguments 必须是 JSON 对象");
-        }
-
-        return new ToolCall(
-                requiredText(output, "call_id", "OpenAI function_call 缺少 call_id"),
-                requiredText(output, "id", "OpenAI function_call 缺少 id"),
-                requiredText(output, "name", "OpenAI function_call 缺少 name"),
-                arguments
-        );
-    }
-
-    /**
-     * 将 OpenAI 响应状态映射为通用模型状态。
-     *
-     * @param status OpenAI 响应状态字符串
-     * @return 对应的通用模型状态
-     * @throws AgentRunException 当状态不属于当前客户端支持的终态时抛出
-     */
-    private ModelStatus parseStatus(String status) {
-        return switch (status) {
-            case "completed" -> ModelStatus.COMPLETED;
-            case "incomplete" -> ModelStatus.INCOMPLETE;
-            case "failed", "cancelled" -> ModelStatus.FAILED;
-            default -> throw new AgentRunException("不支持的 OpenAI 响应状态: " + status);
-        };
-    }
-
-    /**
-     * 根据模型状态提取未完成原因或失败原因。
-     *
-     * @param json   OpenAI Responses API 响应对象
-     * @param status 已映射的通用模型状态
-     * @return 未完成或失败原因；响应正常完成或没有原因时返回 {@code null}
-     */
-    private String parseReason(JsonNode json, ModelStatus status) {
-        if (status == ModelStatus.INCOMPLETE) {
-            String reason = json.path("incomplete_details").path("reason").asText();
-            return reason.isBlank() ? null : reason;
-        }
-        if (status == ModelStatus.FAILED) {
-            String message = json.path("error").path("message").asText();
-            if (!message.isBlank()) {
-                return message;
+        for (JsonNode call : toolCalls) {
+            if (!"function".equals(call.path("type").asText())) {
+                continue;
             }
-            String code = json.path("error").path("code").asText();
-            return code.isBlank() ? null : code;
+            JsonNode function = call.path("function");
+            String name = function.path("name").asText();
+            if (name.isBlank()) {
+                throw new AgentRunException("OpenAI tool_call 缺少 function.name");
+            }
+            String argumentsText = function.path("arguments").asText();
+            if (argumentsText.isBlank()) {
+                argumentsText = "{}";
+            }
+            JsonNode arguments;
+            try {
+                arguments = objectMapper.readTree(argumentsText);
+            } catch (Exception e) {
+                throw new AgentRunException("OpenAI tool_call arguments 不是合法 JSON", e);
+            }
+            if (arguments == null || !arguments.isObject()) {
+                throw new AgentRunException("OpenAI tool_call arguments 必须是 JSON 对象");
+            }
+            String callId = requiredText(call, "id", "OpenAI tool_call 缺少 id");
+            result.add(new ToolCall(callId, callId, name, arguments));
         }
-        return null;
+        return result;
+    }
+
+    /**
+     * 为包含工具调用的响应构造 {@code assistant} 消息，用于续传时与 {@code tool}
+     * 结果配对。
+     *
+     * @param text      模型返回的文本，可能为空
+     * @param toolCalls 本轮工具调用
+     * @return 带 {@code tool_calls} 数组的 assistant 消息
+     */
+    private ObjectNode assistantToolCallMessage(String text, List<ToolCall> toolCalls) {
+        ObjectNode node = objectMapper.createObjectNode().put("role", "assistant");
+        if (text != null && !text.isBlank()) {
+            node.put("content", text);
+        }
+        ArrayNode calls = node.putArray("tool_calls");
+        for (ToolCall toolCall : toolCalls) {
+            ObjectNode call = calls.addObject();
+            call.put("id", toolCall.callId());
+            call.put("type", "function");
+            ObjectNode function = call.putObject("function");
+            function.put("name", toolCall.name());
+            function.put("arguments", toolCall.arguments() == null ? "{}" : toolCall.arguments().toString());
+        }
+        return node;
+    }
+
+    /**
+     * 将 Chat Completions 完成原因映射为通用模型状态。
+     *
+     * @param finishReason 模型返回的完成原因，可能为空字符串
+     * @return 对应的通用模型状态
+     */
+    private ModelStatus parseStatus(String finishReason) {
+        return switch (finishReason) {
+            case "length" -> ModelStatus.INCOMPLETE;
+            case "content_filter" -> ModelStatus.FAILED;
+            default -> ModelStatus.COMPLETED;
+        };
     }
 
     /**
